@@ -1,8 +1,6 @@
 import torch
 from torchvision.models import resnet50, ResNet50_Weights
-from torchvision import transforms
-from PIL import Image
-from ImageClass import *
+from ImageNet100ValDataset import *
 import json
 
 # Modelo preentrenado ResNet50
