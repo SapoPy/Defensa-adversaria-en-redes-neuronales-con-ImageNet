@@ -1,44 +1,63 @@
 import torch
+from torch.utils.data import DataLoader
 from torchvision.models import resnet50, ResNet50_Weights
 from ImageNet100ValDataset import *
 import json
 
-# Modelo preentrenado ResNet50
-weights = ResNet50_Weights.DEFAULT
-model = resnet50(weights=weights)
-model.eval()
 
-# Transformación definida en el script ImageClass
-preprocess = transform
+def evaluate_resnet50():
+    # Modelo preentrenado ResNet50
+    weights = ResNet50_Weights.DEFAULT
+    model = resnet50(weights=weights)
+    model.eval()
 
-# Cargar los 100 labels
-with open("Labels.json") as f:
-    labels = json.load(f)
-selected_classes = list(labels.keys()) # Tienen la forma n01440764
-wnid_to_idx = {wnid: i for i, wnid in enumerate(selected_classes)}  # Diccionario con la clase 
-                                                                    # (del tipo n01440764) y con indice
+    # Transformación definida en el script ImageClass
+    preprocess = transform
 
-# Dataset
-val_dataset = ImageNet100ValDataset(VAL_DIR, transform=preprocess)
+    # Cargar los 100 labels
+    with open("Labels.json") as f:
+        labels = json.load(f)
 
-img, wnid = val_dataset[51]  # Imagen de ejemplo
-img_wnid = list(val_dataset.class_to_idx.keys())[wnid]  # obtener WNID real
-print("WNID de la imagen:", img_wnid)
+    selected_classes = list(labels.keys())
+    wnid_to_idx = {wnid: i for i, wnid in enumerate(selected_classes)}
 
-# evalua la imagen en el modelo
-input_tensor = img.unsqueeze(0) 
-with torch.no_grad():
-    output = model(input_tensor)  # logits de todas las 1000 clases
+    # Dataset
+    val_dataset = ImageNet100ValDataset(VAL_DIR, transform=preprocess)
+    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 
-imagenet_classes = weights.meta["categories"]  # lista 1000 nombres de ImageNet
-selected_indices_in_model = [imagenet_classes.index(labels[wnid].split(',')[0])
-                             for wnid in selected_classes]  # se toma solo la primera palabra del json
 
-filtered_logits = output[0][selected_indices_in_model] # seleccionamos los logit de las clases del conjunto de valdiacion
-filtered_probs = torch.nn.functional.softmax(filtered_logits, dim=0) # aplica softmax en las 100 clases
+    imagenet_classes = weights.meta["categories"]
+    selected_indices_in_model = [
+        imagenet_classes.index(labels[wnid].split(',')[0])
+        for wnid in selected_classes
+    ]
 
-pred_idx_in_filtered = filtered_probs.argmax().item()
-pred_wnid = selected_classes[pred_idx_in_filtered]
-print("Clase predicha (WNID):", pred_wnid)
-print("Nombre legible:", labels[pred_wnid])
-print("Probabilidad:", filtered_probs[pred_idx_in_filtered].item())
+    # Evaluación sobre todas las imágenes
+    correct = 0
+    total = 0
+
+    with torch.no_grad():
+        for imgs, labels_idx in val_loader:
+            # Inferencia
+            outputs = model(imgs)
+
+            # Filtrar solo tus 100 clases
+            filtered_logits = outputs[:, selected_indices_in_model]
+            filtered_probs = torch.nn.functional.softmax(filtered_logits, dim=1)
+
+            # Predicciones
+            preds_in_filtered = filtered_probs.argmax(dim=1)
+
+            # Mapeo de índice filtrado → wnid real
+            pred_wnids = [selected_classes[i] for i in preds_in_filtered]
+            true_wnids = [list(val_dataset.class_to_idx.keys())[i] for i in labels_idx]
+
+            # Calcular precisión
+            correct += sum(p == t for p, t in zip(pred_wnids, true_wnids))
+            total += len(imgs)
+
+    acc = correct / total
+    return acc
+    
+if __name__ == "__main__":
+    print(f"Precisión en validación: {evaluate_resnet50():.4f}")
