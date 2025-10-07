@@ -1,7 +1,6 @@
 import torch
 from torchvision.models import resnet50, ResNet50_Weights
 from ImageNet100ValDataset import *
-import torch
 
 def evaluar_imagen(model, img, selected_indices_in_model):
     """
