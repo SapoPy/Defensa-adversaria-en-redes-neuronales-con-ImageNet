@@ -52,9 +52,11 @@ if __name__ == "__main__":
     selected_indices_in_model = [imagenet_classes.index(labels[wnid].split(',')[0])
                                 for wnid in selected_classes]
 
+
     # Probar con una imagen
-    img, wnid_idx = val_dataset[51]
+    img, wnid_idx = val_dataset[981]
     pred_wnid, nombre_legible, prob = evaluar_imagen(
         model, img, selected_indices_in_model
     )
-    print("Predicción:", pred_wnid, nombre_legible, prob)
+    print("Etiqueta real:", list(val_dataset.class_to_idx.keys())[wnid_idx])
+    print("Predicción:", pred_wnid, prob)
