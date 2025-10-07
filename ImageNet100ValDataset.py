@@ -2,6 +2,7 @@ import os
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
+import json
 
 class ImageNet100ValDataset(Dataset):
     def __init__(self, root_dir, transform=None):
@@ -37,6 +38,11 @@ transform = transforms.Compose([
 ])
 
 VAL_DIR = "val.X"
+
+with open("Labels.json") as f:
+    labels = json.load(f)
+
+selected_classes = list(labels.keys()) 
 
 if __name__ == "__main__":
     val_dataset = ImageNet100ValDataset(VAL_DIR, transform=transform)

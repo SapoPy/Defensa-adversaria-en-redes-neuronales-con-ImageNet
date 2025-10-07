@@ -1,31 +1,34 @@
 import torch
 from torchvision.models import resnet50, ResNet50_Weights
 from ImageNet100ValDataset import *
-import json
+import torch
 
-def evaluar_imagen(model, img):
+def evaluar_imagen(model, img, selected_indices_in_model):
     """
     Evalúa una sola imagen en el modelo.
 
     Parámetros:
-        model: modelo preentrenado 
+        model: modelo preentrenado (por ejemplo, resnet50)
         img: tensor de imagen (C, H, W) ya transformado
-        wnid_real: opcional, el WNID real de la imagen
+        selected_indices_in_model: lista de índices de las clases que se quieren evaluar en el modelo
 
     Devuelve:
         pred_wnid: WNID predicho
-        nombre_legible: nombre de clase
-        probabilidad: valor de probabilidad
+        nombre_legible: nombre de la clase predicha
+        prob: probabilidad asociada
     """
-    input_tensor = img.unsqueeze(0)  # agrega batch dimension
 
+    input_tensor = img.unsqueeze(0)
+
+    # Inferencia sin gradientes
     with torch.no_grad():
         output = model(input_tensor)
 
-    # filtrar solo tus 100 clases
+    # Filtrar los logits solo para las clases seleccionadas
     filtered_logits = output[0][selected_indices_in_model]
     filtered_probs = torch.nn.functional.softmax(filtered_logits, dim=0)
 
+    # Elegir la clase más probable
     pred_idx_in_filtered = filtered_probs.argmax().item()
     pred_wnid = selected_classes[pred_idx_in_filtered]
     prob = filtered_probs[pred_idx_in_filtered].item()
@@ -35,36 +38,23 @@ def evaluar_imagen(model, img):
     return pred_wnid, nombre_legible, prob
 
 
+
 if __name__ == "__main__":
-    # Modelo para ejemplo
+    # Modelo
     weights = ResNet50_Weights.DEFAULT
     model = resnet50(weights=weights)
     model.eval()
 
-    preprocess = transform  # definida en ImageNet100ValDataset
+    # Dataset
+    val_dataset = ImageNet100ValDataset(VAL_DIR, transform=weights.transforms())
 
-    with open("Labels.json") as f:
-        labels = json.load(f)
-
-    selected_classes = list(labels.keys()) 
     imagenet_classes = weights.meta["categories"]
+    selected_indices_in_model = [imagenet_classes.index(labels[wnid].split(',')[0])
+                                for wnid in selected_classes]
 
-    # índices de las 100 clases dentro del modelo
-    selected_indices_in_model = [
-        imagenet_classes.index(labels[wnid].split(',')[0])
-        for wnid in selected_classes
-    ]
-
-
-
-    val_dataset = ImageNet100ValDataset(VAL_DIR, transform=preprocess)
-
+    # Probar con una imagen
     img, wnid_idx = val_dataset[51]
-    wnid_real = list(val_dataset.class_to_idx.keys())[wnid_idx]
-
-    pred_wnid, nombre, prob = evaluar_imagen(model, img)
-
-    print(f"Clase real: {wnid_real}")
-    print(f"Predicha:   {pred_wnid}")
-    print(f"Nombre:     {nombre}")
-    print(f"Probabilidad: {prob:.4f}")
+    pred_wnid, nombre_legible, prob = evaluar_imagen(
+        model, img, selected_indices_in_model
+    )
+    print("Predicción:", pred_wnid, nombre_legible, prob)
