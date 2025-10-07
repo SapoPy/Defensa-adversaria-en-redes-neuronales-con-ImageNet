@@ -2,7 +2,6 @@ import torch
 from torch.utils.data import DataLoader
 from torchvision.models import resnet34, ResNet34_Weights
 from ImageNet100ValDataset import *
-import json
 
 def evaluate_resnet34():
     # Modelo preentrenado ResNet34
@@ -10,20 +9,12 @@ def evaluate_resnet34():
     model = resnet34(weights=weights)
     model.eval()
 
-    # Transformación definida en el script ImageClass
+    # Transformación definida en ImageNet100ValDataset
     preprocess = transform
-
-    # Cargar los 100 labels
-    with open("Labels.json") as f:
-        labels = json.load(f)
-
-    selected_classes = list(labels.keys())
-    wnid_to_idx = {wnid: i for i, wnid in enumerate(selected_classes)}
 
     # Dataset
     val_dataset = ImageNet100ValDataset(VAL_DIR, transform=preprocess)
     val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
-
 
     imagenet_classes = weights.meta["categories"]
     selected_indices_in_model = [
@@ -32,7 +23,8 @@ def evaluate_resnet34():
     ]
 
     # Evaluación sobre todas las imágenes
-    correct = 0
+    correct_top1 = 0
+    correct_top5 = 0
     total = 0
 
     with torch.no_grad():
@@ -46,17 +38,24 @@ def evaluate_resnet34():
 
             # Predicciones
             preds_in_filtered = filtered_probs.argmax(dim=1)
+            
+            top5_preds = torch.topk(filtered_probs, 5, dim=1).indices
 
             # Mapeo de índice filtrado → wnid real
             pred_wnids = [selected_classes[i] for i in preds_in_filtered]
             true_wnids = [list(val_dataset.class_to_idx.keys())[i] for i in labels_idx]
-
-            # Calcular precisión
-            correct += sum(p == t for p, t in zip(pred_wnids, true_wnids))
+            
+            # Sumar aciertos
+            correct_top5 += sum(p in t for p, t in zip(preds_in_filtered, top5_preds))
+            correct_top1 += sum(p == t for p, t in zip(pred_wnids, true_wnids))
             total += len(imgs)
 
-    acc = correct / total
-    return acc
+    acc_top1 = correct_top1 / total
+    acc_top5 = correct_top5 / total
+
+    return acc_top1, acc_top5
     
 if __name__ == "__main__":
-    print(f"Precisión en validación: {evaluate_resnet34():.4f}")
+    acc_top1, acc_top5 = evaluate_resnet34()
+    print(f"Precisión top 1 en validación: {acc_top1:.4f}")
+    print(f"Precisión top 5 en validación: {acc_top5:.4f}")
