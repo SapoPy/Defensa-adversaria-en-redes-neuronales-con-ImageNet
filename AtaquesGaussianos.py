@@ -64,9 +64,6 @@ def apply_noise_to_class(wnid, output_dir, dataset_dir = "val.X",std=0.05):
 
     print(f"Se guardaron {len(list(class_dir.glob('*.JPEG')))} imágenes ruidosas en {output_dir}")
 
-# Ejemplo de uso
-# apply_noise_to_class("val.X", "n01440764", "val_noisy/n01440764", std=0.05)
-
 
 if __name__ == "__main__":
     apply_noise_to_class("n01440764", "val_noisy/n01440764")

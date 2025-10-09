@@ -1,7 +1,4 @@
-from ImageNet100ValDataset import *
-from Modelos.ResNet50 import evaluate_resnet50
-from Modelos.ResNet18 import evaluate_resnet18
-
+import AtaquesGaussianos as ag
 if __name__ == "__main__":
-    print(f"Precisión ResNet50 en validación: {evaluate_resnet50():.4f}")
-    print(f"Precisión ResNet18 en validación: {evaluate_resnet18():.4f}")
+    ag.apply_noise_to_class("n01847000", "val_noisy/n01847000") # hace imagnes de los patos ruidosas
+    ag.apply_noise_to_class("n01883070", "val_noisy/n01883070") # hace imagnes de los wombats ruidosas
