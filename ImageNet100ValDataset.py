@@ -26,14 +26,15 @@ class ImageNet100ValDataset(Dataset):
             img = self.transform(img)
         return img, label
 
-
+MEAN_DATASET = [0.485, 0.456, 0.406]
+STD_DATASET  = [0.229, 0.224, 0.225]
 transform = transforms.Compose([
     transforms.Resize(256),                  # Redimensiona el lado más corto a 256 px
     transforms.CenterCrop(224),              # Recorta el centro a 224×224 (tamaño típico de ImageNet)
     transforms.ToTensor(),                   # Convierte a tensor (0–1)
     transforms.Normalize(                    # Normaliza con medias y desv. estándar de ImageNet
-        mean=[0.485, 0.456, 0.406],
-        std =[0.229, 0.224, 0.225]
+        mean= MEAN_DATASET,
+        std =STD_DATASET
     )
 ])
 
