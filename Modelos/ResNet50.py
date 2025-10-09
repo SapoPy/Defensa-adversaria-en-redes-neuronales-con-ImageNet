@@ -3,7 +3,7 @@ from torch.utils.data import DataLoader
 from torchvision.models import resnet50, ResNet50_Weights
 from ImageNet100ValDataset import *
 
-def evaluate_resnet50():
+def evaluate_resnet50(VAL_DIR="val.X"):
     # Modelo preentrenado ResNet50
     weights = ResNet50_Weights.DEFAULT
     model = resnet50(weights=weights)

@@ -3,7 +3,7 @@ from torch.utils.data import DataLoader
 from torchvision.models import densenet121, DenseNet121_Weights
 from ImageNet100ValDataset import *
 
-def evaluate_densenet121():
+def evaluate_densenet121(VAL_DIR="val.X"):
     # Modelo preentrenado densenet121
     weights = DenseNet121_Weights.DEFAULT
     model = densenet121(weights=weights)

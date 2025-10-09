@@ -3,7 +3,7 @@ from torch.utils.data import DataLoader
 from torchvision.models import vgg16, VGG16_Weights
 from ImageNet100ValDataset import *
 
-def evaluate_vgg16():
+def evaluate_vgg16(VAL_DIR="val.X"):
     # Modelo preentrenado VGG16
     weights = VGG16_Weights.DEFAULT
     model = vgg16(weights=weights)
