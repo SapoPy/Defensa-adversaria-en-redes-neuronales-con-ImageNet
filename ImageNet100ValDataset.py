@@ -2,6 +2,7 @@ import os
 from PIL import Image
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms
+from torchvision.models import ResNet34_Weights
 import json
 
 class ImageNet100ValDataset(Dataset):
@@ -54,6 +55,17 @@ with open("Labels.json") as f:
     labels = json.load(f)
 
 selected_classes = list(labels.keys()) 
+
+weights = ResNet34_Weights.DEFAULT
+
+imagenet_classes = weights.meta["categories"]
+
+# Mapear WNID a nombre de clase entendible por el modelo
+wnid_to_name = {wnid: labels[wnid].split(',')[0] for wnid in selected_classes}
+
+# Obtener índices dentro de las 1000 clases del modelo
+selected_indices_in_model = [imagenet_classes.index(wnid_to_name[wnid]) for wnid in selected_classes]
+
 
 if __name__ == "__main__":
     val_dataset = ImageNet100ValDataset(VAL_DIR, transform=transform)

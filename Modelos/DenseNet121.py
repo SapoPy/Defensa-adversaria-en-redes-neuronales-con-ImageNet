@@ -12,15 +12,6 @@ def evaluate_densenet121(VAL_DIR="val.X"):
     val_dataset = ImageNet100ValDataset(VAL_DIR, transform=transform, labels_json="Labels.json")
     val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 
-    imagenet_classes = weights.meta["categories"]
-
-    # Mapear WNID a nombre de clase entendible por el modelo
-    wnid_to_name = {wnid: labels[wnid].split(',')[0] for wnid in selected_classes}
-
-    # Obtener índices dentro de las 1000 clases del modelo
-    selected_indices_in_model = [imagenet_classes.index(wnid_to_name[wnid]) for wnid in selected_classes]
-
-
     correct_top1 = 0
     correct_top5 = 0
     total = 0
@@ -44,7 +35,10 @@ def evaluate_densenet121(VAL_DIR="val.X"):
             true_wnids = [list(val_dataset.class_to_idx.keys())[i] for i in labels_idx]
             
             # Sumar aciertos
-            correct_top5 += sum(p in t for p, t in zip(preds_in_filtered, top5_preds))
+            for i in range(labels_idx.size(0)):
+                if labels_idx[i].item() in top5_preds[i]:
+                    correct_top5 += 1
+                    
             correct_top1 += sum(p == t for p, t in zip(pred_wnids, true_wnids))
             total += len(imgs)
 

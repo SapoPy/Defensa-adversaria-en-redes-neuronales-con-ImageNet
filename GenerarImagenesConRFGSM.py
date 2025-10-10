@@ -9,8 +9,8 @@ from AtaquesGaussianos import *
 # --- Parámetros ---
 picked_classes = ['n01440764', 'n01847000', 'n01883070']  # peces, patos, wombats
 VAL_DIR = "3 clases"
-OUTPUT_DIR = "RFGSM_out"
-EPSILON = 0.05
+OUTPUT_DIR = "RFGSM_out_015"
+EPSILON = 0.15
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 

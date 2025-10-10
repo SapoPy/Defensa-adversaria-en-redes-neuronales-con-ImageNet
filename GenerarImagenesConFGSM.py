@@ -8,13 +8,13 @@ from torchvision.models import resnet34, ResNet34_Weights
 # Parámetros
 picked_classes = ['n01440764', 'n01847000', 'n01883070']  # peces, patos, wombats
 VAL_DIR = "3 clases"          # carpeta de validación reducida
-OUTPUT_DIR = "FGSM_out"       # carpeta donde se guardarán las perturbaciones
-EPSILON = 0.05               # magnitud de perturbación
+OUTPUT_DIR = "FGSM_out_015"       # carpeta donde se guardarán las perturbaciones
+EPSILON = 0.15               # magnitud de perturbación
 
 # Crear carpeta de salida
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-# Cargar modelo preentrenado
+# Cargar modelo preentrenado ataca a resnet34
 weights = ResNet34_Weights.DEFAULT
 model = resnet34(weights=weights)
 model.eval()
