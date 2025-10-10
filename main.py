@@ -1,4 +1,6 @@
-import AtaquesGaussianos as ag
+from ImageNet100ValDataset import *
+from utils import *
+from torchvision.models import resnet34, ResNet34_Weights
 if __name__ == "__main__":
-    ag.apply_noise_to_class("n01847000", "val_noisy/n01847000") # hace imagnes de los patos ruidosas
-    ag.apply_noise_to_class("n01883070", "val_noisy/n01883070") # hace imagnes de los wombats ruidosas
+    val_dataset = ImageNet100ValDataset("FGSM_out", transform=None)
+    weights = ResNet34_Weights.DEFAULT

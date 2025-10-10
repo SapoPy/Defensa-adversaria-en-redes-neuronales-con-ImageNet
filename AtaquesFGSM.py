@@ -120,7 +120,7 @@ if __name__ == "__main__":
     plt.show()
 
     # 3) crear ejemplo de perturbación tipo FGSM (sumando signo en pixel-space)
-    eps = 8/255
+    eps = 0.05
     img_perturbed = (img_pixel + eps * grad_pixel.sign()).clamp(0.,1.)
 
     # mostrar original vs perturbada
@@ -137,8 +137,8 @@ if __name__ == "__main__":
     model.eval()
     print(f"Perturbation with eps={eps}:")
     pred_wnid, nombre_legible, prob = utils.evaluar_imagen(model, img_tensor, selected_indices_in_model)
-    print(f"Prediction on original image:")
+    print(f"\nPrediction on original image:")
     print(pred_wnid, nombre_legible, prob)
     pred_wnid, nombre_legible, prob = utils.evaluar_imagen(model, img_perturbed, selected_indices_in_model)
-    print(f"Prediction on perturbed image:")
+    print(f"\nPrediction on perturbed image:")
     print(pred_wnid, nombre_legible, prob)

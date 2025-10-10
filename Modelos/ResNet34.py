@@ -4,25 +4,22 @@ from torchvision.models import resnet34, ResNet34_Weights
 from ImageNet100ValDataset import *
 
 def evaluate_resnet34(VAL_DIR="val.X"):
-    # Modelo preentrenado ResNet34
     weights = ResNet34_Weights.DEFAULT
     model = resnet34(weights=weights)
     model.eval()
 
-    # Transformación definida en ImageNet100ValDataset
-    preprocess = transform
-
-    # Dataset
-    val_dataset = ImageNet100ValDataset(VAL_DIR, transform=preprocess)
+    val_dataset = ImageNet100ValDataset(VAL_DIR, transform=transform, labels_json="Labels.json")
     val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 
     imagenet_classes = weights.meta["categories"]
-    selected_indices_in_model = [
-        imagenet_classes.index(labels[wnid].split(',')[0])
-        for wnid in selected_classes
-    ]
 
-    # Evaluación sobre todas las imágenes
+    # Mapear WNID a nombre de clase entendible por el modelo
+    wnid_to_name = {wnid: labels[wnid].split(',')[0] for wnid in selected_classes}
+
+    # Obtener índices dentro de las 1000 clases del modelo
+    selected_indices_in_model = [imagenet_classes.index(wnid_to_name[wnid]) for wnid in selected_classes]
+
+
     correct_top1 = 0
     correct_top5 = 0
     total = 0

@@ -5,16 +5,26 @@ from torchvision import transforms
 import json
 
 class ImageNet100ValDataset(Dataset):
-    def __init__(self, root_dir, transform=None):
+    def __init__(self, root_dir, transform=None, labels_json="Labels.json"):
         self.root_dir = root_dir
         self.transform = transform
-        self.class_to_idx = {c: i for i, c in enumerate(sorted(os.listdir(root_dir)))}
-        self.samples = [
-            (os.path.join(root_dir, c, f), self.class_to_idx[c])
-            for c in self.class_to_idx
-            for f in os.listdir(os.path.join(root_dir, c))
-            if f.lower().endswith(('.jpg', '.jpeg', '.png', '.jpeg'))
-        ]
+
+        # Cargar mapeo global desde Labels.json
+        with open(labels_json) as f:
+            labels = json.load(f)
+
+        # Usar el orden y mapeo original de índices
+        self.class_to_idx = {wnid: i for i, wnid in enumerate(labels.keys())}
+
+        # Cargar las muestras
+        self.samples = []
+        for wnid in self.class_to_idx:
+            class_dir = os.path.join(root_dir, wnid)
+            if not os.path.isdir(class_dir):
+                continue
+            for f in os.listdir(class_dir):
+                if f.lower().endswith(('.jpg', '.jpeg', '.png')):
+                    self.samples.append((os.path.join(class_dir, f), self.class_to_idx[wnid]))
 
     def __len__(self):
         return len(self.samples)

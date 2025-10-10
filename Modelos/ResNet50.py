@@ -4,25 +4,23 @@ from torchvision.models import resnet50, ResNet50_Weights
 from ImageNet100ValDataset import *
 
 def evaluate_resnet50(VAL_DIR="val.X"):
-    # Modelo preentrenado ResNet50
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     weights = ResNet50_Weights.DEFAULT
-    model = resnet50(weights=weights)
+    model = resnet50(weights=weights).to(device)
     model.eval()
 
-    # Transformación definida en ImageNet100ValDataset
-    preprocess = transform
-
-    # Dataset
-    val_dataset = ImageNet100ValDataset(VAL_DIR, transform=preprocess)
+    val_dataset = ImageNet100ValDataset(VAL_DIR, transform=transform, labels_json="Labels.json")
     val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
 
     imagenet_classes = weights.meta["categories"]
-    selected_indices_in_model = [
-        imagenet_classes.index(labels[wnid].split(',')[0])
-        for wnid in selected_classes
-    ]
 
-    # Evaluación sobre todas las imágenes
+    # Mapear WNID a nombre de clase entendible por el modelo
+    wnid_to_name = {wnid: labels[wnid].split(',')[0] for wnid in selected_classes}
+
+    # Obtener índices dentro de las 1000 clases del modelo
+    selected_indices_in_model = [imagenet_classes.index(wnid_to_name[wnid]) for wnid in selected_classes]
+
+
     correct_top1 = 0
     correct_top5 = 0
     total = 0
@@ -54,7 +52,7 @@ def evaluate_resnet50(VAL_DIR="val.X"):
     acc_top5 = correct_top5 / total
 
     return acc_top1, acc_top5
-    
+
 if __name__ == "__main__":
     acc_top1, acc_top5 = evaluate_resnet50()
     print(f"Precisión top 1 en validación: {acc_top1:.4f}")
