@@ -74,7 +74,7 @@ def apply_noise_to_dataset(dataset_dir="val.X", output_dir="val_noisy", std=0.05
 
 
 # --- Mostrar comparación (original / ruido / resultado) ---
-def show_noise_example(img_path, std=0.05):
+def show_noise_example(img_path, std=0.05, save_fig=False):
     to_tensor = transforms.ToTensor()
     to_pil = transforms.ToPILImage()
     noise_fn = AddGaussianNoise(0.0, std)
@@ -103,14 +103,17 @@ def show_noise_example(img_path, std=0.05):
     plt.axis("off")
 
     plt.tight_layout()
+    if save_fig:
+        titulo = f"graficos/comparativa con std = {std} .png"
+        plt.savefig(titulo, dpi=300, transparent=True, bbox_inches="tight")
     plt.show()
 
 
 # --- Ejemplo de uso ---
 if __name__ == "__main__":
     # 1) Aplicar ruido a todo el dataset
-    apply_noise_to_dataset("val.X", "val_noisy_01", std=0.1)
-    apply_noise_to_dataset("val.X", "val_noisy_015", std=0.15)
+    #apply_noise_to_dataset("val.X", "val_noisy_01", std=0.1)
+    #apply_noise_to_dataset("val.X", "val_noisy_015", std=0.15)
     # 2) Mostrar ejemplo visual
-    # example_path = Path("val.X/n01440764/ILSVRC2012_val_00000293.JPEG")
-    # show_noise_example(example_path, std=0.05)
+    example_path = Path("val.X/n01440764/ILSVRC2012_val_00000293.JPEG")
+    show_noise_example(example_path, std=0.05, save_fig=True)
