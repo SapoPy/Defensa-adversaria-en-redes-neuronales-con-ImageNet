@@ -6,7 +6,7 @@ from pathlib import Path
 import json
 
 from torchvision.models import resnet34, ResNet34_Weights
-from ImageNet100ValDataset import ImageNet100ValDataset  # tu clase
+from ImageNet100ValDataset import *  # tu clase
 
 # --- constantes ImageNet ---
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
@@ -252,7 +252,7 @@ if __name__ == "__main__":
 
     # dataset original (carpeta con subfolders wnid/)
     src_dir = "3 clases"   # ajusta
-    ds = ImageNet100ValDataset(src_dir, transform=weights.transforms(), labels_json="Labels.json")
+    ds = ImageNet100ValDataset(src_dir, transform=transform)
 
     # target WNID que queremos forzar (ejemplo)
     target_wnid = "n01514859"
