@@ -118,8 +118,7 @@ def plot_comparison(img_orig_pixel, img_adv_pixel, save_fig=False, eps=None):
 
     # calcular ruido
     noise = img_adv_pixel - img_orig_pixel
-    noise_vis = (noise - noise.min()) / (noise.max() - noise.min() + 1e-8)
-
+    
     plt.figure(figsize=(12, 4))
 
     plt.subplot(1, 3, 1)
@@ -129,7 +128,7 @@ def plot_comparison(img_orig_pixel, img_adv_pixel, save_fig=False, eps=None):
 
     plt.subplot(1, 3, 2)
     plt.title("Perturbación añadida")
-    plt.imshow(noise_vis.permute(1, 2, 0))
+    plt.imshow(noise.permute(1, 2, 0))
     plt.axis("off")
 
     plt.subplot(1, 3, 3)

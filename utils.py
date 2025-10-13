@@ -1,5 +1,9 @@
 import torch
-from torchvision.models import resnet50, ResNet50_Weights
+import torch.nn.functional as F
+from pathlib import Path
+import json
+from PIL import Image
+from torchvision.models import resnet34, ResNet34_Weights
 from ImageNet100ValDataset import *
 
 def evaluar_imagen(model, img, selected_indices_in_model):
@@ -36,26 +40,148 @@ def evaluar_imagen(model, img, selected_indices_in_model):
 
     return pred_wnid, nombre_legible, prob
 
+def load_resnet34(device=None):
+    """
+    Carga un modelo ResNet34 preentrenado con pesos de ImageNet,
+    listo para evaluación, junto con su lista de clases.
+    """
+    device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    weights = ResNet34_Weights.DEFAULT
+    model = resnet34(weights=weights).to(device).eval()
+    imagenet_classes = weights.meta["categories"]
+    preprocess = weights.transforms()
+    return model, imagenet_classes, preprocess
+
+
+# =====================================================
+# MAPEO ENTRE WNID Y CLASES DEL MODELO
+# =====================================================
+
+def load_wnid_mapping(labels_json_path="Labels.json"):
+    """Carga el mapeo WNID → nombre legible desde un JSON."""
+    with open(labels_json_path, "r") as f:
+        wnid2name = json.load(f)
+    return wnid2name
+
+
+def build_class_mapping(dataset_root, imagenet_classes, wnid2name):
+    """
+    Construye un mapeo robusto entre las carpetas locales de ImageNet100
+    y los índices de clase del modelo ResNet34 (1000 clases).
+
+    Retorna:
+        wnid_to_model_idx, model_idx_to_wnid, selected_indices_in_model
+    """
+    dataset_root = Path(dataset_root)
+    selected_classes = sorted([p.name for p in dataset_root.iterdir() if p.is_dir()])
+
+    wnid_to_model_idx = {}
+    for wnid in selected_classes:
+        if wnid not in wnid2name:
+            continue
+        wnid_name = wnid2name[wnid].split(",")[0].lower().strip()
+        match = [i for i, c in enumerate(imagenet_classes) if wnid_name in c.lower()]
+        if match:
+            wnid_to_model_idx[wnid] = match[0]
+
+    selected_indices_in_model = list(wnid_to_model_idx.values())
+    model_idx_to_wnid = {v: k for k, v in wnid_to_model_idx.items()}
+
+    print(f"Total carpetas detectadas en {dataset_root}: {len(selected_classes)}")
+    print(f"Total clases mapeadas correctamente: {len(selected_indices_in_model)}")
+
+    if not selected_indices_in_model:
+        raise ValueError("No se encontró ninguna clase del dataset en las 1000 del modelo. Verifica Labels.json.")
+
+    return wnid_to_model_idx, model_idx_to_wnid, selected_indices_in_model
+
+
+# =====================================================
+# EVALUACIÓN TOP-5 LIMITADA A 100 CLASES
+# =====================================================
+
+def top5_for_image_path(model, img_path, preprocess, imagenet_classes,
+                        selected_indices_in_model, model_idx_to_wnid, wnid2name,
+                        device=None):
+    """
+    Evalúa una imagen (ruta) y retorna las top-5 predicciones restringidas
+    a las clases seleccionadas del dataset (p.ej. las 100 de ImageNet100).
+
+    Devuelve una lista de dicts con:
+    - model_idx
+    - class_name
+    - prob
+    - wnid
+    - wnid_name
+    """
+    device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    img = Image.open(img_path).convert("RGB")
+    x = preprocess(img).unsqueeze(0).to(device)
+    with torch.no_grad():
+        logits = model(x)[0]
+        logits_filtered = logits[selected_indices_in_model]
+        probs = F.softmax(logits_filtered, dim=0)
+
+    k = min(5, len(selected_indices_in_model))
+    topk = torch.topk(probs, k=k)
+
+    results = []
+    for idx_f, p in zip(topk.indices.cpu().tolist(), topk.values.cpu().tolist()):
+        model_idx = selected_indices_in_model[idx_f]
+        wnid = model_idx_to_wnid.get(model_idx, "unknown")
+        wnid_name = wnid2name.get(wnid, "desconocido")
+        class_name = imagenet_classes[model_idx]
+        results.append({
+            "model_idx": model_idx,
+            "class_name": class_name,
+            "prob": p,
+            "wnid": wnid,
+            "wnid_name": wnid_name
+        })
+    return results
+
+import json
+from torchvision.models import resnet34, ResNet34_Weights
+import torch
+
+def wnid_to_model_index(wnid, weights, labels_json="Labels.json"):
+    """
+    Devuelve el índice (0..999) en weights.meta['categories'] correspondiente al wnid.
+    Intenta coincidencia exacta con el nombre "primera parte" del Labels.json,
+    y si no encuentra intenta coincidencia parcial.
+    Lanza ValueError si no puede mapear.
+    """
+    with open(labels_json, "r") as f:
+        wnid2name = json.load(f)
+
+    if wnid not in wnid2name:
+        raise ValueError(f"WNID {wnid} no está en {labels_json}")
+
+    target_name = wnid2name[wnid].split(",")[0].strip().lower()  # p.ej. "wombat"
+    imagenet_classes = weights.meta["categories"]
+
+    # 1) buscar coincidencia exacta (comparando nombres lower)
+    for i, cname in enumerate(imagenet_classes):
+        if cname.lower().strip() == target_name:
+            return i
+
+    # 2) intentar coincidencia parcial por tokens
+    target_token = target_name.split()[0]
+    for i, cname in enumerate(imagenet_classes):
+        if target_token in cname.lower():
+            return i
+
+    raise ValueError(f"No pude mapear {wnid} -> índice en weights.meta['categories'] (buscado '{target_name}').")
 
 
 if __name__ == "__main__":
-    # Modelo
-    weights = ResNet50_Weights.DEFAULT
-    model = resnet50(weights=weights)
-    model.eval()
 
-    # Dataset
-    val_dataset = ImageNet100ValDataset(VAL_DIR, transform=weights.transforms())
+    # --- Ejemplo de uso ---
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    weights = ResNet34_Weights.DEFAULT
+    model = resnet34(weights=weights).to(device)
 
-    imagenet_classes = weights.meta["categories"]
-    selected_indices_in_model = [imagenet_classes.index(labels[wnid].split(',')[0])
-                                for wnid in selected_classes]
-
-
-    # Probar con una imagen
-    img, wnid_idx = val_dataset[981]
-    pred_wnid, nombre_legible, prob = evaluar_imagen(
-        model, img, selected_indices_in_model
-    )
-    print("Etiqueta real:", list(val_dataset.class_to_idx.keys())[wnid_idx])
-    print("Predicción:", pred_wnid, prob)
+    wombat_wnid = "n01883070"   # WNID del wombat (ajusta si tu Labels.json usa otro)
+    target_idx = wnid_to_model_index(wombat_wnid, weights, labels_json="Labels.json")
+    print("Target index in model outputs:", target_idx)
