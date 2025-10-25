@@ -37,7 +37,7 @@ class AddGaussianNoise:
         noise = torch.randn_like(img_pixel) * self.std + self.mean
         return (img_pixel + noise).clamp(0.,1.)
 
-def image_gradient_targeted(model, img_norm, target_idx, device):
+def image_gradient_targeted(model, img_norm, target_idx, device): 
     """
     Calcula ∂L/∂x hacia la clase objetivo.
     """
