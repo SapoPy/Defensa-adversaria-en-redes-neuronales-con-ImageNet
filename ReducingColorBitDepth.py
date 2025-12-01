@@ -1,0 +1,81 @@
+import torch
+from ImageNet100ValDataset import *
+from torchvision.models import resnet34, ResNet34_Weights
+from ataqueFGSM2 import *
+import numpy as np
+
+dataset = ImageNet100ValDataset(VAL_DIR, transform=transform)
+
+def reducebit(x, bits=6):
+    levels = 2 ** bits
+    return torch.floor(x * (levels - 1)) / (levels - 1)
+
+transform_before_model = transforms.Compose([
+    transforms.Resize(256),
+    transforms.CenterCrop(224),
+    transforms.ToTensor(),
+])
+
+model = resnet34(weights=ResNet34_Weights.DEFAULT)
+model.eval()
+
+# Contadores de accuracy
+acc_pure = 0
+acc_attack = 0
+acc_def7 = 0
+acc_def6 = 0
+acc_def5 = 0
+
+N = 5000   # pruebas — pon 5000 si quieres, pero será lento
+
+for i in range(N):
+    # 1. Cargar imagen y etiqueta
+    x, y = dataset[i]
+    x = x.unsqueeze(0)  # batch = 1
+    y = torch.tensor([y])
+
+    # ---- Forward puro ----
+    pred_pure = model(x)[:, selected_indices_in_model].argmax(dim=1)
+    acc_pure += (pred_pure == y).item()
+
+    # ---- Ataque FGSM ----
+    adv = generar_imagen_fgsm(model, x.squeeze(0), y.item(), 0.05)
+    if adv.ndim == 3:
+        adv = adv.unsqueeze(0)
+
+    pred_attack = model(adv)[:, selected_indices_in_model].argmax(dim=1)
+    acc_attack += (pred_attack == y).item()
+
+    # ---- Desnormalizar SOLO si tu FGSM lo normaliza ----
+    adv_denorm = denormalize_tensor(adv.squeeze(0))
+    adv_denorm = adv_denorm
+
+    # ---- DEFENSAS ----
+
+    # Bits 7
+    x7 = reducebit(adv_denorm, bits=7)
+    pred_def7 = model(x7)[:, selected_indices_in_model].argmax(dim=1)
+    acc_def7 += (pred_def7 == y).item()
+
+    # Bits 6
+    x6 = reducebit(adv_denorm, bits=6)
+    pred_def6 = model(x6)[:, selected_indices_in_model].argmax(dim=1)
+    acc_def6 += (pred_def6 == y).item()
+
+    # Bits 5
+    x5 = reducebit(adv_denorm, bits=5)
+    pred_def5 = model(x5)[:, selected_indices_in_model].argmax(dim=1)
+    acc_def5 += (pred_def5 == y).item()
+
+    print(f"[{i}/{N}] pure={pred_pure.item()} atk={pred_attack.item()} bit7={pred_def7.item()} bit6={pred_def6.item()} bit5={pred_def5.item()}")
+
+# -----------------------------------------------------------
+#                   RESULTADOS FINALES
+# -----------------------------------------------------------
+
+print("\nRESULTADOS:")
+print(f"Accuracy Puro:          {acc_pure / N:.4f}")
+print(f"Accuracy Ataque:        {acc_attack / N:.4f}")
+print(f"Accuracy Defensa bit 7: {acc_def7 / N:.4f}")
+print(f"Accuracy Defensa bit 6: {acc_def6 / N:.4f}")
+print(f"Accuracy Defensa bit 5: {acc_def5 / N:.4f}")

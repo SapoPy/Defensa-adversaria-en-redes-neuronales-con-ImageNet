@@ -9,24 +9,14 @@ from PIL import Image
 import matplotlib.pyplot as plt
 from ImageNet100ValDataset import ImageNet100ValDataset
 from DirigidoFGSM import wnid_to_model_index
+from AtaquesFGSM import denormalize_tensor, normalize_for_model
+from DirigidoRFGSM import image_gradient_targeted
 
 # -------------------------
 # Constantes y helpers
 # -------------------------
 MEAN = [0.485, 0.456, 0.406]
 STD  = [0.229, 0.224, 0.225]
-
-def denormalize_pixel(tensor_norm, mean=MEAN, std=STD):
-    """tensor_norm: (C,H,W) -> pixel-space [0,1]"""
-    m = torch.tensor(mean, device=tensor_norm.device).view(-1,1,1)
-    s = torch.tensor(std,  device=tensor_norm.device).view(-1,1,1)
-    return (tensor_norm * s + m).clamp(0.0, 1.0)
-
-def normalize_from_pixel(tensor_pixel, mean=MEAN, std=STD):
-    """tensor_pixel en [0,1] -> normalizado"""
-    m = torch.tensor(mean, device=tensor_pixel.device).view(-1,1,1)
-    s = torch.tensor(std,  device=tensor_pixel.device).view(-1,1,1)
-    return ((tensor_pixel - m) / s)
 
 class AddGaussianNoise:
     """Ruido simple en pixel-space [0,1]"""
@@ -36,22 +26,6 @@ class AddGaussianNoise:
     def __call__(self, img_pixel):
         noise = torch.randn_like(img_pixel) * self.std + self.mean
         return (img_pixel + noise).clamp(0.,1.)
-
-def image_gradient_targeted(model, img_norm, target_idx, device): 
-    """
-    Calcula ∂L/∂x hacia la clase objetivo.
-    """
-    model = model.to(device).eval()
-    x = img_norm.unsqueeze(0).to(device)
-    x.requires_grad_(True)
-
-    out = model(x)
-    loss = F.cross_entropy(out, torch.tensor([target_idx], device=device))
-    model.zero_grad()
-    loss.backward()
-    grad = x.grad.detach().cpu().squeeze(0)  # (C,H,W)
-    return grad
-
 
 def show_pgd_comparison(img_pixel, adv_pixel, save_fig=False, eps=0.05, out_dir="graficos"):
     """Visualización comparativa"""
@@ -99,7 +73,7 @@ def generar_pgd_dirigido(model, val_dataset, target_idx, output_dir="PGD_dirigid
 
     for idx in range(total):
         img_norm, label_local = val_dataset[idx]
-        img_pixel = denormalize_pixel(img_norm.unsqueeze(0)).squeeze(0).cpu()
+        img_pixel = denormalize_tensor(img_norm.unsqueeze(0)).squeeze(0).cpu()
 
         # Ruido inicial aleatorio
         img_rand_pixel = noise_adder(img_pixel)
@@ -107,14 +81,14 @@ def generar_pgd_dirigido(model, val_dataset, target_idx, output_dir="PGD_dirigid
 
         # Iteraciones PGD
         for _ in range(iters):
-            adv_norm = normalize_from_pixel(adv_pixel)
+            adv_norm = normalize_for_model(adv_pixel)
             grad = image_gradient_targeted(model, adv_norm, target_idx, device)
 
             # Paso dirigido: signo negativo (dirigido)
             adv_norm = adv_norm - (alpha / std_cpu) * grad.sign()
 
             # Proyección: mantener dentro de eps del original
-            orig_norm = normalize_from_pixel(img_pixel)
+            orig_norm = normalize_for_model(img_pixel)
             delta = torch.clamp(adv_norm - orig_norm, min=-(eps_cpu / std_cpu), max=(eps_cpu / std_cpu))
             adv_norm = orig_norm + delta
 
@@ -124,7 +98,7 @@ def generar_pgd_dirigido(model, val_dataset, target_idx, output_dir="PGD_dirigid
             adv_norm = torch.max(torch.min(adv_norm, max_norm), min_norm)
 
             # Denormalizar para siguiente iteración
-            adv_pixel = denormalize_pixel(adv_norm.unsqueeze(0)).squeeze(0).cpu()
+            adv_pixel = denormalize_tensor(adv_norm.unsqueeze(0)).squeeze(0).cpu()
 
         # Guardar adversaria final
         try:

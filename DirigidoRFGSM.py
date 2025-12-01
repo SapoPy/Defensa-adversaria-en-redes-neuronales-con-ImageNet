@@ -9,24 +9,13 @@ from PIL import Image
 import matplotlib.pyplot as plt
 from ImageNet100ValDataset import *
 from DirigidoFGSM import wnid_to_model_index
-
+from utils import *
 # -------------------------
 # Constantes y helpers
 # -------------------------
 MEAN = [0.485, 0.456, 0.406]
 STD  = [0.229, 0.224, 0.225]
 
-def denormalize_pixel(tensor_norm, mean=MEAN, std=STD):
-    """tensor_norm: (C,H,W) o (B,C,H,W) normalizado -> pixel-space [0,1]"""
-    m = torch.tensor(mean, device=tensor_norm.device).view(-1,1,1)
-    s = torch.tensor(std,  device=tensor_norm.device).view(-1,1,1)
-    return (tensor_norm * s + m).clamp(0.0, 1.0)
-
-def normalize_from_pixel(tensor_pixel, mean=MEAN, std=STD):
-    """tensor_pixel en [0,1] -> normalizado"""
-    m = torch.tensor(mean, device=tensor_pixel.device).view(-1,1,1)
-    s = torch.tensor(std,  device=tensor_pixel.device).view(-1,1,1)
-    return ((tensor_pixel - m) / s)
 
 class AddGaussianNoise:
     """Ruido simple en pixel-space [0,1]"""
@@ -101,11 +90,11 @@ def generar_rfgsm_dirigido(model, val_dataset, target_idx, output_dir="RFGSM_dir
 
     for idx in range(total):
         img_norm, label_local = val_dataset[idx]
-        img_pixel = denormalize_pixel(img_norm.unsqueeze(0)).squeeze(0).cpu()
+        img_pixel = denormalize_tensor(img_norm.unsqueeze(0)).squeeze(0).cpu()
 
         # Ruido inicial aleatorio
         img_rand_pixel = noise_adder(img_pixel)
-        img_rand_norm = normalize_from_pixel(img_rand_pixel)
+        img_rand_norm = normalize_for_model(img_rand_pixel)
 
         # Gradiente hacia la clase objetivo
         grad_norm = image_gradient_targeted(model, img_rand_norm, target_idx, device)
@@ -119,7 +108,7 @@ def generar_rfgsm_dirigido(model, val_dataset, target_idx, output_dir="RFGSM_dir
         max_norm = ((1.0 - mean_cpu) / std_cpu)
         adv_norm = torch.max(torch.min(adv_norm, max_norm), min_norm)
 
-        adv_pixel = denormalize_pixel(adv_norm.unsqueeze(0)).squeeze(0).cpu()
+        adv_pixel = denormalize_tensor(adv_norm.unsqueeze(0)).squeeze(0).cpu()
 
         # Guardar
         try:

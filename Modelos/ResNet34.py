@@ -14,7 +14,6 @@ def evaluate_resnet34(VAL_DIR="val.X"):
     correct_top1 = 0
     correct_top5 = 0
     total = 0
-
     with torch.no_grad():
         for imgs, labels_idx in val_loader:
             # Inferencia
@@ -40,7 +39,6 @@ def evaluate_resnet34(VAL_DIR="val.X"):
                     
             correct_top1 += sum(p == t for p, t in zip(pred_wnids, true_wnids))
             total += len(imgs)
-
     acc_top1 = correct_top1 / total
     acc_top5 = correct_top5 / total
 
@@ -50,3 +48,4 @@ if __name__ == "__main__":
     acc_top1, acc_top5 = evaluate_resnet34()
     print(f"Precisión top 1 en validación: {acc_top1:.4f}")
     print(f"Precisión top 5 en validación: {acc_top5:.4f}")
+ 

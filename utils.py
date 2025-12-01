@@ -6,6 +6,36 @@ from PIL import Image
 from torchvision.models import resnet34, ResNet34_Weights
 from ImageNet100ValDataset import *
 
+# ------------------ Estadísticas de ImageNet ------------------
+MEAN = [0.485, 0.456, 0.406]
+STD  = [0.229, 0.224, 0.225]
+
+def image_gradient(model, img_norm, label, device=None):
+    device = device or (torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu"))
+    model = model.to(device).eval()
+
+    x = img_norm.unsqueeze(0).to(device)
+    x.requires_grad_(True)
+
+    y = torch.tensor([label], device=device)
+    out = model(x)
+    loss = F.cross_entropy(out, y)
+
+    loss.backward()
+    return x.grad.detach().squeeze(0)   # grad NORMALIZADO
+
+# ------------------ utilidades ------------------
+def denormalize_tensor(tensor_norm, mean=MEAN, std=STD):
+    """tensor_norm: normalizado -> pixel-space [0,1]"""
+    m = torch.tensor(mean, device=tensor_norm.device).view(1, -1, 1, 1)
+    s = torch.tensor(std,  device=tensor_norm.device).view(1, -1, 1, 1)
+    return (tensor_norm * s + m).clamp(0.0, 1.0)
+
+def normalize_tensor(px, mean=MEAN, std=STD):
+    m = torch.tensor(mean, device=px.device).view(1, -1, 1, 1)
+    s = torch.tensor(std,  device=px.device).view(1, -1, 1, 1)
+    return (px - m) / s
+
 def evaluar_imagen(model, img, selected_indices_in_model):
     """
     Evalúa una sola imagen en el modelo.
@@ -27,16 +57,16 @@ def evaluar_imagen(model, img, selected_indices_in_model):
     with torch.no_grad():
         output = model(input_tensor)
 
-    # Filtrar los logits solo para las clases seleccionadas
-    filtered_logits = output[0][selected_indices_in_model]
-    filtered_probs = torch.nn.functional.softmax(filtered_logits, dim=0)
+        # Filtrar los logits solo para las clases seleccionadas
+        filtered_logits = output[0][selected_indices_in_model]
+        filtered_probs = torch.nn.functional.softmax(filtered_logits, dim=0)
 
-    # Elegir la clase más probable
-    pred_idx_in_filtered = filtered_probs.argmax().item()
-    pred_wnid = selected_classes[pred_idx_in_filtered]
-    prob = filtered_probs[pred_idx_in_filtered].item()
+        # Elegir la clase más probable
+        pred_idx_in_filtered = filtered_probs.argmax().item()
+        pred_wnid = selected_classes[pred_idx_in_filtered]
+        prob = filtered_probs[pred_idx_in_filtered].item()
 
-    nombre_legible = labels[pred_wnid]
+        nombre_legible = labels[pred_wnid]
 
     return pred_wnid, nombre_legible, prob
 
@@ -127,7 +157,7 @@ def top5_for_image_path(model, img_path, preprocess, imagenet_classes,
     topk = torch.topk(probs, k=k)
 
     results = []
-    for idx_f, p in zip(topk.indices.cpu().tolist(), topk.values.cpu().tolist()):
+    for idx_f, p in zip(topk.indices.tolist(), topk.values.tolist()):
         model_idx = selected_indices_in_model[idx_f]
         wnid = model_idx_to_wnid.get(model_idx, "unknown")
         wnid_name = wnid2name.get(wnid, "desconocido")
@@ -174,6 +204,97 @@ def wnid_to_model_index(wnid, weights, labels_json="Labels.json"):
 
     raise ValueError(f"No pude mapear {wnid} -> índice en weights.meta['categories'] (buscado '{target_name}').")
 
+def global_evaluate(model, metodo, param, VAL_DIR="val.X"):
+
+    model.eval()
+    val_dataset = ImageNet100ValDataset(VAL_DIR, transform=transform, labels_json="Labels.json")
+    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+
+    correct_top1 = 0
+    correct_top5 = 0
+    total = 0
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    for imgs, labels_idx in val_loader:
+
+        # imgs YA están normalizadas (vienen del transform)
+        if metodo == None:
+            att_imgs = imgs  
+        else:
+            att_imgs = torch.stack([
+                metodo(model, imgs[i], labels_idx[i], param)
+                for i in range(len(imgs))
+                    ]).to(device)
+
+        with torch.no_grad():
+            outputs = model(att_imgs)
+
+            filtered_logits = outputs[:, selected_indices_in_model]
+            filtered_probs = F.softmax(filtered_logits, dim=1)
+
+            preds_in_filtered = filtered_probs.argmax(dim=1)
+            top5_preds = torch.topk(filtered_probs, 5, dim=1).indices
+
+            pred_wnids = [selected_classes[i] for i in preds_in_filtered]
+            true_wnids = [list(val_dataset.class_to_idx.keys())[i] for i in labels_idx]
+
+
+            for i in range(labels_idx.size(0)):
+                if labels_idx[i].item() in top5_preds[i]:
+                    correct_top5 += 1
+
+            correct_top1 += sum(p == t for p, t in zip(pred_wnids, true_wnids))
+            total += len(imgs)
+
+    return correct_top1/total, correct_top5/total
+
+
+def global_transfer(model_atk, model_trans, metodo, param, VAL_DIR="val.X"):
+
+    model_atk.eval()
+    model_trans.eval()
+    val_dataset = ImageNet100ValDataset(VAL_DIR, transform=transform, labels_json="Labels.json")
+    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+
+    correct_top1 = 0
+    correct_top5 = 0
+    total = 0
+
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    for imgs, labels_idx in val_loader:
+
+        # imgs YA están normalizadas (vienen del transform)
+        if metodo == None:
+            att_imgs = imgs  
+        else:
+            att_imgs = torch.stack([
+                metodo(model_atk, imgs[i], labels_idx[i], param)
+                for i in range(len(imgs))
+                    ]).to(device)
+
+        with torch.no_grad():
+            outputs = model_trans(att_imgs)
+
+            filtered_logits = outputs[:, selected_indices_in_model]
+            filtered_probs = F.softmax(filtered_logits, dim=1)
+
+            preds_in_filtered = filtered_probs.argmax(dim=1)
+            top5_preds = torch.topk(filtered_probs, 5, dim=1).indices
+
+            pred_wnids = [selected_classes[i] for i in preds_in_filtered]
+            true_wnids = [list(val_dataset.class_to_idx.keys())[i] for i in labels_idx]
+
+
+            for i in range(labels_idx.size(0)):
+                if labels_idx[i].item() in top5_preds[i]:
+                    correct_top5 += 1
+
+            correct_top1 += sum(p == t for p, t in zip(pred_wnids, true_wnids))
+            total += len(imgs)
+
+    return correct_top1/total, correct_top5/total
 
 if __name__ == "__main__":
 

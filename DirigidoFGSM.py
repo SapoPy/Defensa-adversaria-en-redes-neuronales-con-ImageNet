@@ -8,9 +8,9 @@ import torch.nn.functional as F
 from torchvision.utils import save_image
 import matplotlib.pyplot as plt
 from PIL import Image
-
 from torchvision.models import resnet34, ResNet34_Weights
 from ImageNet100ValDataset import ImageNet100ValDataset
+from utils import *
 
 # ---------------------------
 # Constantes ImageNet
@@ -18,26 +18,6 @@ from ImageNet100ValDataset import ImageNet100ValDataset
 MEAN = [0.485, 0.456, 0.406]
 STD  = [0.229, 0.224, 0.225]
 
-# ---------------------------
-# Utilidades (normalize/denormalize)
-# ---------------------------
-def denormalize_tensor(tensor, mean=MEAN, std=STD):
-    """tensor (1,C,H,W) o (C,H,W) normalizado -> pixel-space [0,1]"""
-    t = tensor
-    if t.dim() == 4 and t.size(0) == 1:
-        t = t.squeeze(0)
-    m = torch.tensor(mean, device=t.device).view(-1,1,1)
-    s = torch.tensor(std,  device=t.device).view(-1,1,1)
-    return (t * s + m).clamp(0.0, 1.0)
-
-def normalize_tensor_pixel(tensor_pixel, mean=MEAN, std=STD):
-    """tensor (1,C,H,W) o (C,H,W) en pixel-space [0,1] -> normalizado para el modelo"""
-    t = tensor_pixel
-    if t.dim() == 4 and t.size(0) == 1:
-        t = t.squeeze(0)
-    m = torch.tensor(mean, device=t.device).view(-1,1,1)
-    s = torch.tensor(std,  device=t.device).view(-1,1,1)
-    return ((t - m) / s)
 
 # ---------------------------
 # mapear WNID -> índice del modelo (0..999)
