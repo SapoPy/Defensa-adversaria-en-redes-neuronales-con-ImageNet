@@ -1,7 +1,7 @@
 import torch
 from ImageNet100ValDataset import *
 from torchvision.models import resnet34, ResNet34_Weights
-from ataqueFGSM2 import *
+from ataqueFGSM import *
 
 def reducebit(x, bits=4):
     x = x.clone()
@@ -32,19 +32,18 @@ if __name__ == "__main__":
     acc_def6 = 0
     acc_def5 = 0
 
-    N = 5000   # pruebas — pon 5000 si quieres, pero será lento
+    N = 5000   
 
     for i in range(N):
-        # 1. Cargar imagen y etiqueta
+        # Cargar imagen y etiqueta
         x, y = dataset[i]
-        x = x.unsqueeze(0)  # batch = 1
+        x = x.unsqueeze(0) 
         y = torch.tensor([y])
 
-        # ---- Forward puro ----
         pred_pure = model(x)[:, selected_indices_in_model].argmax(dim=1)
         acc_pure += (pred_pure == y).item()
 
-        # ---- Ataque FGSM ----
+        #  Ataque FGSM 
         adv = generar_imagen_fgsm(model, x.squeeze(0), y.item(), 0.05)
         if adv.ndim == 3:
             adv = adv.unsqueeze(0)
@@ -52,11 +51,11 @@ if __name__ == "__main__":
         pred_attack = model(adv)[:, selected_indices_in_model].argmax(dim=1)
         acc_attack += (pred_attack == y).item()
 
-        # ---- Desnormalizar SOLO si tu FGSM lo normaliza ----
+        #  Desnormalizar 
         adv_denorm = denormalize_tensor(adv.squeeze(0))
         adv_denorm = adv_denorm
 
-        # ---- DEFENSAS ----
+        #  DEFENSAS 
 
         # Bits 7
         x7 = reducebit(adv_denorm, bits=7)

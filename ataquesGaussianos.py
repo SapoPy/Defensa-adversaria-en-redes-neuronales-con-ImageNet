@@ -19,7 +19,7 @@ def evaluate_gaussian_attack(model, val_dir, sigma):
     return global_evaluate(model, generar_imagen_gaussian, [sigma], val_dir)
 
 
-# ------------------ ejemplo de uso (estructura igual al rFGSM) ------------------
+
 if __name__ == "__main__":
     from torchvision.models import resnet34, ResNet34_Weights
 
@@ -33,7 +33,7 @@ if __name__ == "__main__":
 
     sigma = 0.05
 
-    # 1) evaluar on-the-fly con global_evaluate
+
     acc_top1, acc_top5 = global_evaluate(model, generar_imagen_gaussian, [sigma], VAL_DIR)
     print(f"Precisión top 1 (gaussian on-the-fly): {acc_top1:.4f}")
     print(f"Precisión top 5 (gaussian on-the-fly): {acc_top5:.4f}")

@@ -6,7 +6,7 @@ from PIL import Image
 from torchvision.models import resnet34, ResNet34_Weights
 from ImageNet100ValDataset import *
 
-# ------------------ Estadísticas de ImageNet ------------------
+#  Estadísticas de ImageNet 
 MEAN = [0.485, 0.456, 0.406]
 STD  = [0.229, 0.224, 0.225]
 
@@ -48,7 +48,7 @@ def image_gradient(model, img_norm, labels):
     return x.grad if not single else x.grad[0]
 
 
-# ------------------ utilidades ------------------
+#  utilidades 
 def denormalize_tensor(tensor_norm, mean=MEAN, std=STD):
     """tensor_norm: normalizado -> pixel-space [0,1]"""
     m = torch.tensor(mean, device=tensor_norm.device).view(1, -1, 1, 1)
@@ -107,9 +107,7 @@ def load_resnet34(device=None):
     return model, imagenet_classes, preprocess
 
 
-# =====================================================
 # MAPEO ENTRE WNID Y CLASES DEL MODELO
-# =====================================================
 
 def load_wnid_mapping(labels_json_path="Labels.json"):
     """Carga el mapeo WNID → nombre legible desde un JSON."""
@@ -150,9 +148,7 @@ def build_class_mapping(dataset_root, imagenet_classes, wnid2name):
     return wnid_to_model_idx, model_idx_to_wnid, selected_indices_in_model
 
 
-# =====================================================
 # EVALUACIÓN TOP-5 LIMITADA A 100 CLASES
-# =====================================================
 
 def top5_for_image_path(model, img_path, preprocess, imagenet_classes,
                         selected_indices_in_model, model_idx_to_wnid, wnid2name,
@@ -362,7 +358,6 @@ def ensure_batch(imgs, labels):
 
 if __name__ == "__main__":
 
-    # --- Ejemplo de uso ---
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     weights = ResNet34_Weights.DEFAULT
     model = resnet34(weights=weights).to(device)

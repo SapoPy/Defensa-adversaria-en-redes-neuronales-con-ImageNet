@@ -67,11 +67,11 @@ if __name__ == "__main__":
     VAL_DIR = "3 clases"
     val_ds = ImageNet100ValDataset(VAL_DIR, transform=transform)
 
-    # eps correcto para ImageNet — el más común
+
     eps = 0.05
-    alpha = 2/255
+    alpha = 0.01
     k = 1
-    sigma = 1/255
+    sigma = 0.01
     acc_top1, acc_top5 = global_evaluate(model, generar_imagen_RPGD, [eps, alpha, k, sigma], VAL_DIR)
     print(f"Precisión top 1: {acc_top1:.4f}")
     print(f"Precisión top 5: {acc_top5:.4f}")

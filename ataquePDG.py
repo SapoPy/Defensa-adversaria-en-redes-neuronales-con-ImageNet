@@ -44,9 +44,6 @@ def generar_imagen_PGD_dirigido(model, imgs, labels, args):
 
     return adv[0] if single else adv
 
-# -------------------------
-# Ejemplo de uso
-# -------------------------
 if __name__ == "__main__":
     from torchvision.models import resnet34, ResNet34_Weights
 
@@ -58,9 +55,9 @@ if __name__ == "__main__":
     VAL_DIR = "3 clases"
     val_ds = ImageNet100ValDataset(VAL_DIR, transform=transform)
 
-    # eps correcto para ImageNet — el más común
+
     eps = 0.05
-    alpha = 2/255
+    alpha = 0.01
     k = 1
 
     acc_top1, acc_top5 = global_evaluate(model, generar_imagen_PGD, [eps, alpha, k], VAL_DIR)

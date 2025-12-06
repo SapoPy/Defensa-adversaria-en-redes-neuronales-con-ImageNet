@@ -2,8 +2,8 @@ from PIL import Image
 import io
 import torch
 import numpy as np
-from ataqueFGSM2 import *
-from AtaquesGaussianos2 import *
+from ataqueFGSM import *
+from AtaquesGaussianos import *
 from ImageNet100ValDataset import *
 from torchvision.models import resnet34, ResNet34_Weights
 from utils import *
