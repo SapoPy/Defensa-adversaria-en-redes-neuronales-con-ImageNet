@@ -1,29 +1,35 @@
 import torch
-import torch.nn.functional as F
-from torchvision.utils import save_image
-import matplotlib.pyplot as plt
-from pathlib import Path
 from ImageNet100ValDataset import *
 from utils import *
 from AtaquesGaussianos2 import *
 
-def generar_imagen_rfgsm(model, img_norm, label, args):
-    """
-    args[0] = eps
-    args[1] 0 alpha
-    img_norm: imagen NORMALIZADA (C,H,W)
-    Devuelve adv_norm: imagen adversarial NORMALIZADA
-    """
-    noise = torch.empty_like(img_norm).uniform_(-args[1], args[1])
-    grad = image_gradient(model, img_norm + noise, label)
+def generar_imagen_rfgsm(model, imgs, labels, args):
+    eps  = args[0]
+    alpha = args[1]
 
-    # FGSM en espacio NORMALIZADO
-    adv_norm = img_norm + noise - args[0] * grad.sign()
+    imgs, labels, single = ensure_batch(imgs, labels)
 
-    # Clamp en normalizado evita explosiones
-    adv_norm = adv_norm.clamp(-3, 3)
+    noise = torch.empty_like(imgs).uniform_(-alpha, alpha)
+    grad = image_gradient(model, imgs + noise, labels)
 
-    return adv_norm 
+    adv = imgs + noise - eps * grad.sign()
+    adv = adv.clamp(-3, 3)
+
+    return adv[0] if single else adv
+
+def generar_imagen_rfgsm_dirigido(model, imgs, labels, args):
+    eps  = args[0]
+    alpha = args[1]
+
+    imgs, labels, single = ensure_batch(imgs, labels)
+
+    noise = torch.empty_like(imgs).uniform_(-alpha, alpha)
+    grad = image_gradient(model, imgs + noise, labels)
+
+    adv = imgs + noise + eps * grad.sign()
+    adv = adv.clamp(-3, 3)
+
+    return adv[0] if single else adv
 
 
 # ------------------ ejemplo de uso ------------------

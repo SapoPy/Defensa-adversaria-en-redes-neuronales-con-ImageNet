@@ -1,26 +1,48 @@
-import os
-from pathlib import Path
 import torch
-import matplotlib.pyplot as plt
 from ImageNet100ValDataset import ImageNet100ValDataset
-from DirigidoFGSM import wnid_to_model_index
-from DirigidoRFGSM import image_gradient_targeted
 from utils import * 
 
-def generar_imagen_PGD(model, img_norm, label, args):
-    """
-    args[0] = eps      ruido uniforme
-    args[1] = alpha    tamaño del paso
-    args[2] = iteraciones
-    """
-    noise = torch.empty_like(img_norm).uniform_(-args[1], args[1])
-    img = img_norm + noise
-    for _ in range(args[2]):
-        grad = image_gradient(model, img, label)
-        img = img - args[1] * grad.sign()   
-        img = torch.clamp(img - img_norm, min=-args[0], max=args[0])
+def generar_imagen_PGD(model, imgs, labels, args):
+    eps     = args[0]
+    alpha   = args[1]
+    iters   = args[2]
 
-    return img 
+    imgs, labels, single = ensure_batch(imgs, labels)
+
+    # Inicialización aleatoria dentro de [-eps,eps]
+    noise = torch.empty_like(imgs).uniform_(-eps, eps)
+    adv = imgs + noise
+
+    for _ in range(iters):
+        grad = image_gradient(model, adv, labels)
+        adv = adv - alpha * grad.sign()
+
+        # Proyecto al L∞ (imagenes normalizadas)
+        perturb = torch.clamp(adv - imgs, -eps, eps)
+        adv = imgs + perturb
+
+    return adv[0] if single else adv
+
+def generar_imagen_PGD_dirigido(model, imgs, labels, args):
+    eps     = args[0]
+    alpha   = args[1]
+    iters   = args[2]
+
+    imgs, labels, single = ensure_batch(imgs, labels)
+
+    # Inicialización aleatoria dentro de [-eps,eps]
+    noise = torch.empty_like(imgs).uniform_(-eps, eps)
+    adv = imgs + noise
+
+    for _ in range(iters):
+        grad = image_gradient(model, adv, labels)
+        adv = adv + alpha * grad.sign()
+
+        # Proyecto al L∞ (imagenes normalizadas)
+        perturb = torch.clamp(adv - imgs, -eps, eps)
+        adv = imgs + perturb
+
+    return adv[0] if single else adv
 
 # -------------------------
 # Ejemplo de uso

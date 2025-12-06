@@ -1,27 +1,58 @@
 
-from pathlib import Path
 import torch
 from ImageNet100ValDataset import ImageNet100ValDataset
 from utils import * 
 
-def generar_imagen_RPGD(model, img_norm, label, args):
-    """
-    args[0] = eps      ruido uniforme
-    args[1] = alpha    tamaño del paso
-    args[2] = iteraciones
-    args[3] = sigma
-    """
-    noise = torch.empty_like(img_norm).uniform_(-args[1], args[1])
-    img = img_norm + noise
-    for _ in range(args[2]):
-        grad = image_gradient(model, img , label)
-        img = img - args[1] * grad.sign()   
-        img = torch.clamp(img - img_norm, min=-args[0], max=args[0])
-        noise = torch.empty_like(img_norm).uniform_(-args[3], args[3])
-        img = img + noise
+def generar_imagen_RPGD(model, imgs, labels, args):
+    eps     = args[0]
+    alpha   = args[1]
+    iters   = args[2]
+    sigma   = args[3]
 
-    return img
+    imgs, labels, single = ensure_batch(imgs, labels)
 
+    noise = torch.empty_like(imgs).uniform_(-eps, eps)
+    adv = imgs + noise
+
+    for _ in range(iters):
+        grad = image_gradient(model, adv, labels)
+        adv = adv - alpha * grad.sign()
+
+        perturb = torch.clamp(adv - imgs, -eps, eps)
+        adv = imgs + perturb
+
+        # ruido aleatorio al final de cada paso
+        noise = torch.empty_like(imgs).uniform_(-sigma, sigma)
+        adv = adv + noise
+
+    adv = adv.clamp(-3, 3)
+    return adv[0] if single else adv
+
+
+def generar_imagen_RPGD_dirigido(model, imgs, labels, args):
+    eps     = args[0]
+    alpha   = args[1]
+    iters   = args[2]
+    sigma   = args[3]
+
+    imgs, labels, single = ensure_batch(imgs, labels)
+
+    noise = torch.empty_like(imgs).uniform_(-eps, eps)
+    adv = imgs + noise
+
+    for _ in range(iters):
+        grad = image_gradient(model, adv, labels)
+        adv = adv + alpha * grad.sign()
+
+        perturb = torch.clamp(adv - imgs, -eps, eps)
+        adv = imgs + perturb
+
+        # ruido aleatorio al final de cada paso
+        noise = torch.empty_like(imgs).uniform_(-sigma, sigma)
+        adv = adv + noise
+
+    adv = adv.clamp(-3, 3)
+    return adv[0] if single else adv
 # ------------------------- 
 # Ejemplo de uso
 # -------------------------

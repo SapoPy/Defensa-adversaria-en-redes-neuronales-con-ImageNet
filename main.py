@@ -7,27 +7,21 @@ from torchvision.models import resnet34, ResNet34_Weights
 from torchvision import transforms
 from ImageNet100ValDataset import ImageNet100ValDataset, transform
 
-# -------------------------
-# Configuración base
-# -------------------------
+
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 weights = ResNet34_Weights.DEFAULT
 model = resnet34(weights=weights).to(device).eval()
 imagenet_classes = weights.meta["categories"]
 
-# -------------------------
-# Cargar mapping WNID <-> nombre
-# -------------------------
+
 with open("Labels.json", "r") as f:
     wnid2name = json.load(f)
 
-# Carpetas del dataset (100 clases)
+
 dataset_root = Path("val.X")
 selected_classes = sorted([p.name for p in dataset_root.iterdir() if p.is_dir()])
 
-# -------------------------
-# Mapeo robusto WNID → índice de clase del modelo
-# -------------------------
+
 wnid_to_model_idx = {}
 for wnid in selected_classes:
     if wnid not in wnid2name:
@@ -47,9 +41,7 @@ print(f"Total clases mapeadas correctamente: {len(selected_indices_in_model)}")
 if not selected_indices_in_model:
     raise ValueError("No se encontró ninguna clase de val.X en las 1000 del modelo. Verifica Labels.json y los nombres de carpeta.")
 
-# -------------------------
-# Función Top-5 (solo tus 100 clases)
-# -------------------------
+
 def top5_for_image_path(model, img_path, preprocess, device=device):
     img = Image.open(img_path).convert("RGB")
     x = preprocess(img).unsqueeze(0).to(device)
@@ -75,9 +67,7 @@ def top5_for_image_path(model, img_path, preprocess, device=device):
         })
     return results
 
-# -------------------------
-# Ejemplo de uso
-# -------------------------
+
 if __name__ == "__main__":
     img_path = r"val.X\n01440764\ILSVRC2012_val_00000293.JPEG"
 

@@ -10,19 +10,43 @@ from ImageNet100ValDataset import *
 MEAN = [0.485, 0.456, 0.406]
 STD  = [0.229, 0.224, 0.225]
 
-def image_gradient(model, img_norm, label, device=None):
-    device = device or (torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu"))
-    model = model.to(device).eval()
+def image_gradient(model, img_norm, labels):
+    """
+    img_norm: (C,H,W) o (B,C,H,W)
+    labels  : int o tensor(B)
+    Devuelve gradiente con misma forma que img_norm (batched).
+    """
+    # Asegurar batch
+    single = False
+    if img_norm.dim() == 3:
+        img_norm = img_norm.unsqueeze(0)
+        labels = torch.tensor([labels], device=img_norm.device)
+        single = True
+    elif img_norm.dim() == 4:
+        if not torch.is_tensor(labels):
+            labels = torch.tensor(labels, device=img_norm.device)
+        if labels.dim() == 0:
+            labels = labels.unsqueeze(0)
+    else:
+        raise ValueError("img_norm debe tener 3 o 4 dimensiones")
 
-    x = img_norm.unsqueeze(0).to(device)
-    x.requires_grad_(True)
+    device = next(model.parameters()).device
+    img_norm = img_norm.to(device)
+    labels = labels.to(device)
 
-    y = torch.tensor([label], device=device)
+    # MUY IMPORTANTE: que sea leaf tensor
+    x = img_norm.clone().detach().requires_grad_(True)
+
+    # forward
     out = model(x)
-    loss = F.cross_entropy(out, y)
+    loss = F.cross_entropy(out, labels)
 
+    # backward
     loss.backward()
-    return x.grad.detach().squeeze(0)   # grad NORMALIZADO
+
+    # x.grad ahora sí existe
+    return x.grad if not single else x.grad[0]
+
 
 # ------------------ utilidades ------------------
 def denormalize_tensor(tensor_norm, mean=MEAN, std=STD):
@@ -295,6 +319,46 @@ def global_transfer(model_atk, model_trans, metodo, param, VAL_DIR="val.X"):
             total += len(imgs)
 
     return correct_top1/total, correct_top5/total
+
+def ensure_batch(imgs, labels):
+    """
+    Acepta imgs: (C,H,W) o (B,C,H,W)
+            labels: int, list, tensor scalar, or tensor(B)
+    Devuelve: imgs_batched (B,C,H,W), labels_batched (B,), single_flag (bool)
+    """
+    single = False
+
+    # si imgs es PIL o numpy, asumimos que ya fue transformado (tensor)
+    if not torch.is_tensor(imgs):
+        raise ValueError("ensure_batch espera un tensor como imgs")
+
+    # mover labels a tensor si no lo es
+    if not torch.is_tensor(labels):
+        labels = torch.tensor(labels)
+
+    # asegurar device: si imgs ya está en GPU, mover labels ahí después
+    device = imgs.device
+
+    if imgs.dim() == 3:               # (C,H,W) -> convert to (1,C,H,W)
+        imgs = imgs.unsqueeze(0)
+        single = True
+    elif imgs.dim() == 4:
+        # ya está batched
+        pass
+    else:
+        raise ValueError(f"imgs debe tener dim 3 o 4, pero tiene {imgs.dim()}")
+
+    # labels -> tensor(B,)
+    if labels.dim() == 0:            # scalar -> [label]
+        labels = labels.unsqueeze(0)
+    elif labels.dim() == 1:
+        pass
+    else:
+        labels = labels.view(-1)
+
+    labels = labels.to(device)
+    return imgs, labels, single
+
 
 if __name__ == "__main__":
 
