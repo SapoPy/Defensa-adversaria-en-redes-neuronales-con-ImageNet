@@ -38,5 +38,6 @@ Entre las defensas consideradas están:
 
 ## Notebooks
 
-El repositorio también incluye algunos archivos `.ipynb` utilizados para ejecutar y validar los ataques y defensas en Google Colab, facilitando la reproducción de los experimentos.
+El repositorio también incluye algunos archivos `.ipynb` utilizados para ejecutar y validar los ataques y defensas en Google Colab, facilitando la reproducción de los experimentos, tambien esta `utils.py` que contiene funciones auxiliares para que los otros archivos
+funciones.
 
